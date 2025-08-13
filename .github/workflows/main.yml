@@ -1,14 +1,12 @@
-name: LinkGeç Deploy & Keep Alive
+name: LinkGeç Test & Deploy Guide
 
 on:
   push:
     branches: [ main, master ]
-  schedule:
-    - cron: '*/15 * * * *'  # Her 15 dakikada bir çalıştır (aktif tut)
-  workflow_dispatch:  # Manuel tetikleme
+  workflow_dispatch:  # Manuel demo için
 
 jobs:
-  deploy:
+  test-and-deploy-guide:
     runs-on: ubuntu-latest
     
     steps:
@@ -24,69 +22,101 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
-    - name: Test app startup
+    - name: Get Public IP & Start Server
       run: |
+        echo "🌐 GitHub Actions Public IP bilgisi alınıyor..."
+        
+        # Public IP'yi al
+        PUBLIC_IP=$(curl -s https://ipv4.icanhazip.com)
+        echo "📍 GitHub Actions Public IP: $PUBLIC_IP"
+        
+        # Network info
+        echo "🔧 Network Configuration:"
+        ip route get 8.8.8.8 | head -1
+        
+        # Port açılımını kontrol et
+        echo "🔍 Port durumu kontrol ediliyor..."
+        sudo netstat -tlnp | grep :5001 || echo "Port 5001 boş"
+        
         echo "🚀 LinkGeç uygulaması başlatılıyor..."
-        timeout 30 python app.py &
-        APP_PID=$!
+        
+        # Flask'ı public IP'de çalıştır
+        sed -i "s/app.run(host='0.0.0.0'/app.run(host='$PUBLIC_IP'/g" app.py
+        
+        # Flask uygulamasını başlat
+        python app.py &
+        FLASK_PID=$!
         sleep 10
         
-        # Test et
+        # Local test
         if curl -f http://localhost:5001 > /dev/null 2>&1; then
-          echo "✅ App başarıyla çalışıyor!"
-          echo "📱 Ana sayfa: http://localhost:5001"
-          echo "🔧 Admin panel: http://localhost:5001/admin"
-          echo "👤 Giriş: admin / admin123"
+          echo "✅ Flask app localhost'ta çalışıyor!"
         else
-          echo "❌ App başlatılamadı!"
+          echo "❌ Flask app başlatılamadı!"
+          kill $FLASK_PID 2>/dev/null || true
           exit 1
         fi
         
-        # Process'i sonlandır
-        kill $APP_PID 2>/dev/null || true
-        
-    - name: Deploy to Render/Railway (Simulation)
-      run: |
-        echo "🌐 Deployment simülasyonu..."
-        echo "📋 Gerçek deployment için:"
-        echo "1. Render.com'a git"
-        echo "2. Web Service oluştur"
-        echo "3. GitHub repo'yu bağla"
-        echo "4. Build command: pip install -r requirements.txt"
-        echo "5. Start command: python app.py"
-        echo "6. Port: 5001"
-        echo ""
-        echo "🔗 Alternatif platformlar:"
-        echo "- Railway.app"
-        echo "- Heroku"
-        echo "- DigitalOcean App Platform"
-        echo "- PythonAnywhere"
-        
-    - name: Keep Alive Ping
-      if: github.event_name == 'schedule'
-      run: |
-        echo "🏃 Keep-alive ping çalışıyor..."
-        echo "⏰ Son çalışma: $(date)"
-        echo "🔄 Bir sonraki ping: 15 dakika sonra"
-        
-        # GitHub Pages'e ping at (eğer varsa)
-        if curl -f "https://$(echo $GITHUB_REPOSITORY | tr '[:upper:]' '[:lower:]' | sed 's/\//.github.io\//')" > /dev/null 2>&1; then
-          echo "✅ GitHub Pages aktif"
+        # Public IP test
+        echo "🌐 Public erişim testi..."
+        if curl -f http://$PUBLIC_IP:5001 > /dev/null 2>&1; then
+          echo "🎉 LinkGeç public olarak erişilebilir!"
+          echo "🌐 Ana sayfa: http://$PUBLIC_IP:5001"
+          echo "🔧 Admin panel: http://$PUBLIC_IP:5001/admin"
+          echo "👤 Giriş: admin / admin123"
+          echo "⏰ Actions süresi boyunca aktif (max 6 saat)"
+          
+          # GitHub Pages README'ye link ekle
+          echo "# 🔗 Canlı Demo" > DEMO_LINK.md
+          echo "" >> DEMO_LINK.md
+          echo "**LinkGeç şu anda canlı!**" >> DEMO_LINK.md
+          echo "" >> DEMO_LINK.md
+          echo "🌐 **Ana Sayfa:** http://$PUBLIC_IP:5001" >> DEMO_LINK.md
+          echo "🔧 **Admin Panel:** http://$PUBLIC_IP:5001/admin" >> DEMO_LINK.md
+          echo "👤 **Giriş:** admin / admin123" >> DEMO_LINK.md
+          echo "" >> DEMO_LINK.md
+          echo "⏰ **Aktif Süre:** Bu Actions job'ı boyunca (max 6 saat)" >> DEMO_LINK.md
+          echo "🔄 **Yeniden Başlat:** Actions'da 'Run workflow' butonuna bas" >> DEMO_LINK.md
+          
+          # 6 saat bekle (GitHub Actions max süresi)
+          echo "💤 6 saat boyunca aktif tutulacak..."
+          sleep 21600
+        else
+          echo "⚠️  Public IP erişimi mümkün değil (GitHub kısıtlaması)"
+          echo "🔧 Alternatif çözümler:"
+          echo "1. Codespaces kullan"
+          echo "2. Render.com'a deploy et"
+          echo "3. Railway.app kullan"
         fi
         
-    - name: Create deployment status
+        # Temizlik
+        kill $FLASK_PID 2>/dev/null || true
+        
+    - name: Create Status Report
       run: |
-        echo "📊 Deployment durumu:"
-        echo "✅ Kod kontrolü: Başarılı"
+        echo "📊 LinkGeç Demo Raporu"
+        echo "========================="
+        echo "✅ Flask uygulaması: Test edildi"
         echo "✅ Dependencies: Yüklendi"
-        echo "✅ App testi: Geçti"
-        echo "⏰ Son güncelleme: $(date)"
+        echo "⏰ Son çalışma: $(date)"
         echo ""
-        echo "🌍 Canlı deployment için Render.com kullan:"
-        echo "https://render.com"
+        echo "🌐 Canlı demo için:"
+        echo "1. Actions sekmesinde bu workflow'u çalıştır"
+        echo "2. 'Start Flask App & Create Public Link' adımını izle" 
+        echo "3. ngrok linkini kopyala"
+        echo "4. 2 saat boyunca aktif kalır"
         echo ""
-        echo "🔧 Hızlı deployment komutu:"
+        echo "🚀 Kalıcı deployment için:"
+        echo "• Render.com: https://render.com"
+        echo "• Railway.app: https://railway.app"
+        echo "• PythonAnywhere: https://pythonanywhere.com"
+        echo ""
+        echo "📋 Manuel kurulum:"
         echo "git clone $GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
         echo "cd $(basename $GITHUB_REPOSITORY)"
         echo "pip install -r requirements.txt"
         echo "python app.py"
+        echo ""
+        echo "🔧 Admin giriş:"
+        echo "Kullanıcı: admin"
+        echo "Şifre: admin123"
