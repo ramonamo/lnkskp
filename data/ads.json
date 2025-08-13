@@ -1,0 +1,17 @@
+[
+    {
+        "position": 1,
+        "ad_type": "banner",
+        "ad_content": "Reklam Alanı 1"
+    },
+    {
+        "position": 2,
+        "ad_type": "banner",
+        "ad_content": "Reklam Alanı 2"
+    },
+    {
+        "position": 3,
+        "ad_type": "banner",
+        "ad_content": "Reklam Alanı 3"
+    }
+]
